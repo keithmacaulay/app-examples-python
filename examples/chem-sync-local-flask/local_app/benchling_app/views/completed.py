@@ -6,6 +6,7 @@ from benchling_sdk.models import (
     AppSessionMessageCreate,
     AppSessionMessageStyle,
     AppSessionUpdateStatus,
+    AsyncTask,
     MarkdownUiBlock,
     MarkdownUiBlockType,
     Molecule,
@@ -35,11 +36,34 @@ def render_completed_canvas(
     )
 
 
+def render_completed_canvas_aop(
+    aop: AsyncTask,
+    canvas_id: str,
+    canvas_builder: CanvasBuilder,
+    session: SessionContextManager,
+) -> None:
+    canvas_builder = canvas_builder.with_blocks(_completed_blocks())
+    session.app.benchling.apps.update_canvas(
+        canvas_id,
+        canvas_builder.with_enabled().to_update(),
+    )
+    session.close_session(
+        AppSessionUpdateStatus.SUCCEEDED,
+        messages=[
+            AppSessionMessageCreate(
+                # ref() will turn supported objects into clickable "chips" in the Benchling UI
+                f"Molecule uploaded",
+                style=AppSessionMessageStyle.SUCCESS,
+            ),
+        ],
+    )
+
+
 def _completed_blocks() -> list[UiBlock]:
     return [
         MarkdownUiBlock(
             id="completed",
             type=MarkdownUiBlockType.MARKDOWN,
-            value="The chemical has been synced into Benchling! Please follow procedures for next steps.",
+            value="The molecule has been uploaded to Benchling. Hit **Sync run data** 🔄 to see registration progress.",
         ),
     ]

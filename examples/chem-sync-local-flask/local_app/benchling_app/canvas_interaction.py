@@ -5,13 +5,13 @@ from urllib.parse import quote
 from benchling_sdk.apps.canvas.framework import CanvasBuilder
 from benchling_sdk.apps.framework import App
 from benchling_sdk.apps.status.errors import AppUserFacingError
-from benchling_sdk.models import AppCanvasUpdate, Molecule
+from benchling_sdk.models import AppCanvasUpdate, AsyncTask, Molecule
 from benchling_sdk.models.webhooks.v0 import CanvasInteractionWebhookV2
 
-from local_app.benchling_app.molecules import create_molecule
+from local_app.benchling_app.molecules import create_molecule, create_molecule_csv
 from local_app.benchling_app.views.canvas_initialize import input_blocks
 from local_app.benchling_app.views.chemical_preview import render_preview_canvas
-from local_app.benchling_app.views.completed import render_completed_canvas
+from local_app.benchling_app.views.completed import render_completed_canvas, render_completed_canvas_aop
 from local_app.benchling_app.views.constants import (
     CANCEL_BUTTON_ID,
     CID_KEY,
@@ -31,6 +31,7 @@ class UnsupportedButtonError(Exception):
 
 def route_interaction_webhook(app: App, canvas_interaction: CanvasInteractionWebhookV2) -> None:
     canvas_id = canvas_interaction.canvas_id
+    resource_id = app.benchling.apps.get_canvas_by_id(canvas_id).resource_id
     if canvas_interaction.button_id == SEARCH_BUTTON_ID:
         with app.create_session_context("Search Chemicals", timeout_seconds=20) as session:
             session.attach_canvas(canvas_id)
@@ -51,8 +52,8 @@ def route_interaction_webhook(app: App, canvas_interaction: CanvasInteractionWeb
         with app.create_session_context("Create Molecules", timeout_seconds=20) as session:
             session.attach_canvas(canvas_id)
             canvas_builder = _canvas_builder_from_canvas_id(app, canvas_id)
-            molecule = _create_molecule_from_canvas(app, canvas_builder)
-            render_completed_canvas(molecule, canvas_id, canvas_builder, session)
+            aop = _create_aop_from_canvas(app, canvas_builder, resource_id)
+            render_completed_canvas_aop(aop, canvas_id, canvas_builder, session)
     else:
         # Re-enable the Canvas, or it will stay disabled and the user will be stuck
         app.benchling.apps.update_canvas(canvas_id, AppCanvasUpdate(enabled=True))
@@ -72,6 +73,17 @@ def _create_molecule_from_canvas(app: App, canvas_builder: CanvasBuilder) -> Mol
     chemical_cid = canvas_data[CID_KEY]
     chemical = get_by_cid(chemical_cid)
     return create_molecule(app, chemical)
+
+
+def _create_aop_from_canvas(app: App, canvas_builder: CanvasBuilder, resource_id: str) -> AsyncTask:
+    # JSON can be almost any type, cast only needed if you care about type safety checks like MyPy
+    canvas_data = cast(dict, canvas_builder.data_to_json())
+    # Only needed for type safety
+    assert canvas_data is not None
+    logger.debug("Canvas data: %s", canvas_data)
+    chemical_cid = canvas_data[CID_KEY]
+    chemical = get_by_cid(chemical_cid)
+    return create_molecule_csv(app, chemical, resource_id)
 
 
 def _canvas_builder_from_canvas_id(app: App, canvas_id: str) -> CanvasBuilder:

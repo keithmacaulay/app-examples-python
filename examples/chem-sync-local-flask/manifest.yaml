@@ -1,7 +1,7 @@
 manifestVersion: 1
 
 info:
-  name: Sample Sync App
+  name: Sample Sync App - AOP
   version: 0.1.0
 features:
   - name: Sync Step

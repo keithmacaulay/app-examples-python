@@ -3,6 +3,8 @@ from typing import Any
 from benchling_sdk.apps.framework import App
 from benchling_sdk.helpers.serialization_helpers import fields
 from benchling_sdk.models import (
+    AsyncTask,
+    AutomationOutputProcessorCreate,
     Molecule,
     MoleculeCreate,
     MoleculeStructure,
@@ -40,3 +42,24 @@ def create_molecule(app: App, chemical_result: dict[str, Any]) -> Molecule:
         ),
     )
     return app.benchling.molecules.create(molecule_create)
+
+
+def create_molecule_csv(app: App, chemical_result: dict[str, Any], resource_id: str) -> AsyncTask:
+    logger.debug("Chemical to create: %s", chemical_result)
+    csv_headers = "Chemical Name,CID,SMILES,Molecular Weight,Monoisotopic\n"
+    csv_rows = f"{chemical_result['name']},cid:{chemical_result['cid']},{chemical_result['smiles']},{chemical_result['molecularWeight']},{chemical_result['monoisotopic']}\n"
+    csv_str = csv_headers + csv_rows
+    logger.debug("CSV to create: %s", csv_str)
+    blob = app.benchling.blobs.create_from_bytes(csv_str.encode("utf-8"), name="PubChem Molecule.csv")
+    logger.debug("Blob created: %s", blob.id)
+    logger.debug("Run ID: %s", resource_id)
+    aop = app.benchling.lab_automation.create_output_processor(
+        automation_output_processor=AutomationOutputProcessorCreate(
+            assay_run_id=resource_id,
+            automation_file_config_name="Compound Registration",
+            file_id=blob.id,
+            complete_with_errors=True,
+        ),
+    )
+    process = app.benchling.lab_automation.process_output(output_processor_id=aop.id)
+    return app.benchling.tasks.wait_for_task(process.task_id)
