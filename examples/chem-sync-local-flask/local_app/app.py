@@ -23,7 +23,7 @@ def create_app() -> Flask:
         # TODO: Verify webhook from Benchling and dispatch the work
         # For security, don't do anything else without first verifying the webhook
         # app_def_id = app_definition_id()
-        # verify(app_def_id, request.data.decode("utf-8"), request.headers)
+        # verify(app_def_id, request.data.decode("utf-8"), request.headers) # type: ignore[arg-type]
 
         logger.debug("Received webhook message: %s", request.json)
         # Dispatch work and ACK webhook as quickly as possible
