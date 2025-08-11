@@ -19,8 +19,66 @@ services:
       # Client secret for the Benchling App, stored somewhere securely in production.
       # Injected here for convenience. Each Client ID will have its own Client secret
       - CLIENT_SECRET_FILE=/run/secrets/app_client_secret
+      # RabbitMQ configuration
+      - RABBITMQ_HOST=rabbitmq-broker
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_QUEUE=benchling_webhooks
+      - RABBITMQ_DEFAULT_USER
+      - RABBITMQ_DEFAULT_PASS
     secrets:
       - app_client_secret
+    depends_on:
+      rabbitmq-broker:
+        condition: service_healthy
+
+  # RabbitMQ Worker service for processing webhook messages
+  rabbitmq-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    volumes:
+      - type: bind
+        source: .
+        target: /src
+    environment:
+      # Enable debug logging for Python Benchling App
+      - BENCHLING_APP_LOG_LEVEL=DEBUG
+      # Client ID is not sensitive and is the same across all tenants, so could be hard-coded
+      - CLIENT_ID
+      - APP_DEFINITION_ID
+      # Client secret for the Benchling App, stored somewhere securely in production.
+      - CLIENT_SECRET_FILE=/run/secrets/app_client_secret
+      # RabbitMQ configuration
+      - RABBITMQ_HOST=rabbitmq-broker
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_QUEUE=benchling_webhooks
+      - RABBITMQ_DEFAULT_USER
+      - RABBITMQ_DEFAULT_PASS
+    secrets:
+      - app_client_secret
+    depends_on:
+      rabbitmq-broker:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # RabbitMQ Broker service
+  rabbitmq-broker:
+    image: rabbitmq:3
+    command: >
+      bash -c "echo 'log.console.level = warning' > /etc/rabbitmq/conf.d/99-log-level.conf && rabbitmq-server"
+    healthcheck:
+      test: rabbitmq-diagnostics check_port_connectivity
+      interval: 1s
+      timeout: 3s
+      retries: 30
+    ports:
+      - "5672:5672"   # RabbitMQ default port
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER
+      - RABBITMQ_DEFAULT_PASS
+    restart: unless-stopped
 
   # FOR LOCAL DEVELOPMENT ONLY!
   # Free tool for providing a public URL to forward webhooks to our Benchling App running locally
@@ -31,6 +89,9 @@ services:
     image: cloudflare/cloudflared
     restart: unless-stopped
     command: tunnel --url http://benchling-app:5000
+
+volumes:
+  rabbitmq_data:
 
 secrets:
   app_client_secret:

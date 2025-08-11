@@ -1,0 +1,18 @@
+FROM python:3.11
+
+# Install pip and setuptools
+RUN pip install pip~=23.3.2 setuptools~=69.0.3
+
+# Copy requirements and install dependencies
+COPY requirements.txt ./
+RUN pip install -r requirements.txt
+
+# Copy the local_app directory and the worker script
+COPY ./local_app /src/local_app
+COPY rabbitmq_worker.py /src/
+
+# Set working directory
+WORKDIR /src
+
+# Run the RabbitMQ worker
+CMD ["python", "rabbitmq_worker.py"]

@@ -1,13 +1,29 @@
-from threading import Thread
+import asyncio
+import json
+import os
+from typing import Any
 
 from benchling_sdk.apps.helpers.webhook_helpers import verify
+from faststream.rabbit import RabbitBroker
 from flask import Flask, request
 
-from local_app.benchling_app.handler import handle_webhook
 from local_app.benchling_app.setup import app_definition_id
 from local_app.lib.logger import get_logger
 
 logger = get_logger()
+
+# RabbitMQ configuration
+RABBITMQ_HOST = os.getenv("RABBITMQ_HOST")
+RABBITMQ_PORT = os.getenv("RABBITMQ_PORT")
+RABBITMQ_QUEUE = os.getenv("RABBITMQ_QUEUE")
+RABBITMQ_USER = os.getenv("RABBITMQ_DEFAULT_USER")
+RABBITMQ_PASSWORD = os.getenv("RABBITMQ_DEFAULT_PASS")
+
+# Build RabbitMQ connection URL
+connection_url = f"amqp://{RABBITMQ_USER}:{RABBITMQ_PASSWORD}@{RABBITMQ_HOST}:{RABBITMQ_PORT}/"
+
+# Initialize FastStream broker for publishing
+broker = RabbitBroker(url=connection_url)
 
 
 def create_app() -> Flask:
@@ -37,10 +53,23 @@ def create_app() -> Flask:
 
 
 def _enqueue_work() -> None:
-    # PRODUCTION NOTE: A high volume of webhooks may spawn too many threads and lead to processing failures
-    # In production, we recommend a more robust queueing system for scale
-    thread = Thread(
-        target=handle_webhook,
-        args=(request.json,),
-    )
-    thread.start()
+    """Publish webhook message to RabbitMQ broker for asynchronous processing."""
+    try:
+        message = json.dumps(request.json)
+        
+        # Run the async publish operation
+        asyncio.run(_publish_message_async(message))
+        
+        logger.debug("Successfully published webhook message to RabbitMQ queue: %s", RABBITMQ_QUEUE)
+            
+    except Exception as e:
+        logger.error("Error publishing to RabbitMQ: %s", e)
+
+async def _publish_message_async(message: str) -> None:
+    """Async function to publish message using FastStream broker."""
+    async with broker:
+        await broker.publish(
+            message,
+            queue=RABBITMQ_QUEUE,
+            persist=True  # Make message persistent
+        )
