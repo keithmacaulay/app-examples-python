@@ -3,3 +3,4 @@ flask~=3.0.2
 benchling-sdk[cryptography]==1.22.0
 # FastStream RabbitMQ client for processing webhook messages
 faststream[rabbit]
+dotenv

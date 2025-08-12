@@ -10,6 +10,7 @@ import asyncio
 import json
 import os
 from contextlib import asynccontextmanager
+from dotenv import load_dotenv
 
 from faststream import FastStream
 from faststream.rabbit import (
@@ -22,19 +23,23 @@ from faststream.rabbit import (
 from local_app.benchling_app.handler import handle_webhook
 from local_app.lib.logger import get_logger
 
+load_dotenv()
 logger = get_logger()
 
 # RabbitMQ configuration
 RABBITMQ_HOST = os.getenv("RABBITMQ_HOST")
 RABBITMQ_PORT = os.getenv("RABBITMQ_PORT")
-RABBITMQ_QUEUE = os.getenv("RABBITMQ_QUEUE")
 RABBITMQ_USER = os.getenv("RABBITMQ_DEFAULT_USER")
 RABBITMQ_PASSWORD = os.getenv("RABBITMQ_DEFAULT_PASS")
+APP_DEFINITION_ID = os.getenv("APP_DEFINITION_ID")
 
-# Build RabbitMQ connection URL
 connection_url = f"amqp://{RABBITMQ_USER}:{RABBITMQ_PASSWORD}@{RABBITMQ_HOST}:{RABBITMQ_PORT}/"
 exchange = RabbitExchange(name="benchling_webhooks", durable=True, type=ExchangeType.TOPIC)
-queue = RabbitQueue(name=RABBITMQ_QUEUE, durable=True)
+queue = RabbitQueue(
+    f"{APP_DEFINITION_ID}_all_canvas",
+    durable=True,
+    routing_key=f"*.{APP_DEFINITION_ID}.*.canvas.*",
+)
 
 # Initialize FastStream broker
 broker = RabbitBroker(url=connection_url)
@@ -54,7 +59,7 @@ app = FastStream(broker, lifespan=lifespan)
 async def process_webhook_message(body: str):
     """Process webhook messages from the RabbitMQ queue."""
     try:
-        logger.info("📨 Received message from queue %s", RABBITMQ_QUEUE)
+        logger.info("📨 Received message from queue")
         logger.info("📄 Message payload: %s", body)
         
         # Parse the JSON message
@@ -75,5 +80,6 @@ async def process_webhook_message(body: str):
 
 if __name__ == "__main__":
     logger.info("FastStream RabbitMQ worker is running. Press Ctrl+C to stop.")
-    logger.info("Waiting for messages from queue '%s'", RABBITMQ_QUEUE)
+    logger.info("Waiting for messages from queue")
     asyncio.run(app.run())
+ 
