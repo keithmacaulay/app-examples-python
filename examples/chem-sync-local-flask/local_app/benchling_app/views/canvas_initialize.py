@@ -36,7 +36,17 @@ def start_blocks() -> list[UiBlock]:
         MarkdownUiBlock(
             id="intro",
             type=MarkdownUiBlockType.MARKDOWN,
-            value="Enter some blurb here on what this app does",
+            value="This example app demonstrates the use of App Canvas, and the various UI blocks that can be used to create a canvas. This App can embedded in both the Notebook and via Runs.",
+        ),
+        MarkdownUiBlock(
+            id="intro1",
+            type=MarkdownUiBlockType.MARKDOWN,
+            value="Each page of the app demonstrates a different UI block, and code examples of how to use it (either via the API or the Benchling SDK).",
+        ),
+        MarkdownUiBlock(
+            id="intro2",
+            type=MarkdownUiBlockType.MARKDOWN,
+            value="At the end of each page, there is a button to navigate to the next page. You can also navigate back to the previous page using the previous button.",
         ),
         ButtonUiBlock(
             id="next_0",
