@@ -9,47 +9,35 @@ by calling the handle_webhook function using FastStream.
 import asyncio
 import json
 import os
-import ssl
 from contextlib import asynccontextmanager
-from dotenv import load_dotenv
 
 from faststream import FastStream
-from faststream.security import SASLPlaintext
 from faststream.rabbit import (
     RabbitBroker, 
+    RabbitExchange, 
+    ExchangeType,
     RabbitQueue,
 )
 
 from local_app.benchling_app.handler import handle_webhook
 from local_app.lib.logger import get_logger
 
-load_dotenv()
 logger = get_logger()
 
 # RabbitMQ configuration
 RABBITMQ_HOST = os.getenv("RABBITMQ_HOST")
 RABBITMQ_PORT = os.getenv("RABBITMQ_PORT")
+RABBITMQ_QUEUE = os.getenv("RABBITMQ_QUEUE")
 RABBITMQ_USER = os.getenv("RABBITMQ_DEFAULT_USER")
 RABBITMQ_PASSWORD = os.getenv("RABBITMQ_DEFAULT_PASS")
-APP_DEFINITION_ID = os.getenv("APP_DEFINITION_ID")
 
-connection_url = f"amqp://{RABBITMQ_HOST}:{RABBITMQ_PORT}"
-
-ssl_context = ssl.create_default_context()
-
-security = SASLPlaintext(
-    ssl_context=ssl_context,
-    username=RABBITMQ_USER,
-    password=RABBITMQ_PASSWORD,
-)
-queue = RabbitQueue(
-    f"{APP_DEFINITION_ID}_all_canvas",
-    durable=True,
-    routing_key=f"*.{APP_DEFINITION_ID}.*.canvas.*",
-)
+# Build RabbitMQ connection URL
+connection_url = f"amqp://{RABBITMQ_USER}:{RABBITMQ_PASSWORD}@{RABBITMQ_HOST}:{RABBITMQ_PORT}/"
+exchange = RabbitExchange(name="benchling_webhooks", durable=True, type=ExchangeType.TOPIC)
+queue = RabbitQueue(name=RABBITMQ_QUEUE, durable=True)
 
 # Initialize FastStream broker
-broker = RabbitBroker(url=connection_url, security=security)
+broker = RabbitBroker(url=connection_url)
 
 @asynccontextmanager
 async def lifespan():
@@ -62,22 +50,22 @@ async def lifespan():
 # Initialize FastStream app
 app = FastStream(broker, lifespan=lifespan)
 
-@broker.subscriber(queue)
+@broker.subscriber(queue, exchange)
 async def process_webhook_message(body: str):
     """Process webhook messages from the RabbitMQ queue."""
     try:
-        logger.info("📨 Received message from queue")
+        logger.info("📨 Received message from queue %s", RABBITMQ_QUEUE)
         logger.info("📄 Message payload: %s", body)
-
+        
         # Parse the JSON message
         webhook_dict = json.loads(body)
         logger.info("✅ Parsed webhook message successfully")
-
+        
         # Process the webhook
         logger.info("🔄 Processing webhook message...")
         handle_webhook(webhook_dict)
         logger.info("✅ Successfully processed webhook message")
-
+        
     except json.JSONDecodeError as e:
         logger.error("❌ Failed to parse message as JSON: %s", e)
         raise  # Let FastStream handle the error and decide on requeue/reject
@@ -87,6 +75,5 @@ async def process_webhook_message(body: str):
 
 if __name__ == "__main__":
     logger.info("FastStream RabbitMQ worker is running. Press Ctrl+C to stop.")
-    logger.info("Waiting for messages from queue")
+    logger.info("Waiting for messages from queue '%s'", RABBITMQ_QUEUE)
     asyncio.run(app.run())
- 
