@@ -422,11 +422,6 @@ blocks = [
             type=MarkdownUiBlockType.MARKDOWN,
             value="# 🧮 Table UI Block",
         ),
-            MarkdownUiBlock(
-            id="markdown_9a",
-            type=MarkdownUiBlockType.MARKDOWN,
-            value="# 🧮 Table UI Block",
-        ),
         TableUiBlock(
             id="table_9",
             type=TableUiBlockType.TABLE,
@@ -437,12 +432,12 @@ blocks = [
             ),
         ),
         MarkdownUiBlock(
-            id="markdown_9b",
+            id="markdown_9a",
             type=MarkdownUiBlockType.MARKDOWN,
             value="### API Example\n```json\n{\n    \"id\": \"table_1\",\n    \"name\": \"(Name) Table 1)\",\n    \"source\": {\n        \"datasetId\": \"dset_abc123def\"\n    },\n    \"type\": \"TABLE\"\n}",
         ),
         MarkdownUiBlock(
-            id="markdown_9c",
+            id="markdown_9b",
             type=MarkdownUiBlockType.MARKDOWN,
             value="### SDK Example\n```python\nfrom benchling_sdk.models import (\n    TableUiBlock,\n    TableUiBlockType,\n    TableUiBlockDataFrameSource,\n    TableUiBlockDataFrameSourceType,\n)\n\nTableUiBlock(\n    id='table_1',\n    type=TableUiBlockType.TABLE,\n    name='(Name) Table 1',\n    source=TableUiBlockDataFrameSource(\n        type=TableUiBlockDataFrameSourceType.DATA_FRAME,\n        data_frame_id='dset_abc123def',\n    ),\n)",
         ),
